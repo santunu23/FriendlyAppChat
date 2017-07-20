@@ -10,7 +10,7 @@ public class FriendlyMessage {
     private String photoUrl;
 
     public FriendlyMessage() {
-        super("FriendlyMessage");
+        super();
     }
 
     public FriendlyMessage(String text, String name, String photoUrl) {

@@ -1,6 +1,7 @@
 package ohnnu.friendlychatapp;
 
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -15,16 +16,21 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.Toast;
+import com.firebase.ui.auth.AuthUI;
 import com.google.firebase.*;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-
-
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -43,6 +49,10 @@ public class MainActivity extends AppCompatActivity {
     private DatabaseReference mFirebaseDatabaseReference;
     private ChildEventListener monchildlistner;
     private String mUsername;
+    private FirebaseAuth mFirebaseAuth;
+    private FirebaseAuth.AuthStateListener mAuthStateListner;
+    public static final int RC_SIGN_IN = 1;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,8 +61,9 @@ public class MainActivity extends AppCompatActivity {
 
         mUsername = ANONYMOUS;
 
-        mFirebaseDatabase=FirebaseDatabase.getInstance();
-        mFirebaseDatabaseReference=mFirebaseDatabase.getReference().child("message");
+        mFirebaseDatabase = FirebaseDatabase.getInstance();
+        mFirebaseDatabaseReference = mFirebaseDatabase.getReference().child("message");
+        mFirebaseAuth = FirebaseAuth.getInstance();
 
 
         // Initialize references to views
@@ -65,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize message ListView and its adapter
         List<FriendlyMessage> friendlyMessage = new ArrayList<>();
-        mMessageAdapter = new MessageAdapter(this, R.layout.item_message,friendlyMessage);
+        mMessageAdapter = new MessageAdapter(this, R.layout.item_message, friendlyMessage);
         mMessageListView.setAdapter(mMessageAdapter);
 
 
@@ -73,18 +84,19 @@ public class MainActivity extends AppCompatActivity {
         mProgressBar.setVisibility(ProgressBar.INVISIBLE);
 
         // ImagePickerButton shows an image picker to upload a image for a message
-        mPhotoPickerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // TODO: Fire an intent to show an image picker
-            }
-        });
+//        mPhotoPickerButton.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                // TODO: Fire an intent to show an image picker
+//            }
+//        });
 
         // Enable Send button when there's text to send
         mMessageEditText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
             }
+
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
                 if (charSequence.toString().trim().length() > 0) {
@@ -93,6 +105,7 @@ public class MainActivity extends AppCompatActivity {
                     mSendButton.setEnabled(false);
                 }
             }
+
             @Override
             public void afterTextChanged(Editable editable) {
             }
@@ -104,35 +117,86 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 // TODO: Send messages on click
-          FriendlyMessage friendlyMessage=new FriendlyMessage(mMessageEditText.getText().toString(), mUsername, null);
-                 mFirebaseDatabaseReference.push().setValue(friendlyMessage);
+                FriendlyMessage friendlyMessage = new FriendlyMessage(mMessageEditText.getText().toString(), mUsername, null);
+                mFirebaseDatabaseReference.push().setValue(friendlyMessage);
                 // Clear input box
                 mMessageEditText.setText("");
             }
         });
-        monchildlistner=new ChildEventListener() {
-            @Override
-            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                FriendlyMessage friendlymessage=dataSnapshot.getValue(FriendlyMessage.class);
-                mMessageAdapter.add(friendlymessage);
-                mMessageAdapter.notifyDataSetChanged();
-            }
-            @Override
-            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-            }
-            @Override
-            public void onChildRemoved(DataSnapshot dataSnapshot) {
-            }
-            @Override
-            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-            }
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        };
-           //when a message added on the database at that time addchildeventlistener will fire up and refer us to onchildadded method
-        mFirebaseDatabaseReference.addChildEventListener(monchildlistner);
 
-    }
+        if (monchildlistner == null) {
+            monchildlistner = new ChildEventListener() {
+                @Override
+                public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                    FriendlyMessage friendlymessage = dataSnapshot.getValue(FriendlyMessage.class);
+                    mMessageAdapter.add(friendlymessage);
+                    mMessageAdapter.notifyDataSetChanged();
+                }
+
+                @Override
+                public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+                }
+
+                @Override
+                public void onChildRemoved(DataSnapshot dataSnapshot) {
+                }
+
+                @Override
+                public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+                }
+            };
+            //when a message added on the database at that time addchildeventlistener will fire up and refer us to onchildadded method
+            mFirebaseDatabaseReference.addChildEventListener(monchildlistner);
+            mAuthStateListner=new FirebaseAuth.AuthStateListener(){
+                 @Override
+                public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                     FirebaseUser user=firebaseAuth.getCurrentUser();
+                     if(user!=null){
+                         //user is signed in
+                         Toast.makeText(MainActivity.this,"Welcome to the chat system",Toast.LENGTH_LONG).show();
+                          }
+                     else{
+                         //user is singned out
+                         startActivityForResult(
+                                 AuthUI.getInstance()
+                                         .createSignInIntentBuilder()
+                                         .setProviders(
+                                                         AuthUI.FACEBOOK_PROVIDER,
+                                                         AuthUI.GOOGLE_PROVIDER,
+                                                         AuthUI.EMAIL_PROVIDER
+                                                        ).build(),
+                                 RC_SIGN_IN);
+                     }
+        }
+    };
+}}
+
+   @Override
+    public boolean onCreateOptionsMenu(Menu menu){
+       MenuInflater inflater=getMenuInflater();
+       inflater.inflate(R.menu.main_menu,menu);
+       return false;
+   }
+   @Override
+   public boolean onOptionsItemSelected(MenuItem item){
+     return  super.onOptionsItemSelected(item);
+
+   }
+@Override
+    protected  void onPause(){
+    super.onPause();
+   mFirebaseAuth.removeAuthStateListener(mAuthStateListner);
+}
+@Override
+    protected void onResume(){
+    super.onResume();
+  mFirebaseAuth.addAuthStateListener(mAuthStateListner);
+}
+
+
 
 }
